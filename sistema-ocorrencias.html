@@ -43,9 +43,6 @@ onSnapshot(q, (snapshot) => {
   if (activeTab === 'dash')   renderDash();
   if (activeTab === 'gestao') renderGestao();
   document.getElementById('loadingOverlay')?.remove();
-}, (error) => {
-  console.error('Firestore error:', error);
-  document.getElementById('loadingOverlay')?.remove();
 });
 
 // Escuta secretaria em tempo real
@@ -55,8 +52,6 @@ onSnapshot(qSec, (snapshot) => {
   if (typeof updateSecAlertas === 'function') updateSecAlertas();
   const activeTab = document.querySelector('.nav-tab.active')?.id?.replace('tab-','');
   if (activeTab === 'sec') renderSecHist();
-}, (error) => {
-  console.error('Firestore sec error:', error);
 });
 </script>
 <style>
@@ -949,6 +944,7 @@ tr:hover td{background:var(--paper)}
       </select>
       <select id="filterTurma" onchange="renderDash()">
         <option value="">Todas as turmas</option>
+      </select>
     </div>
   </div>
 
@@ -2089,6 +2085,7 @@ window.saveTratar = function() {
 window.closeTratarModal = function(e) { if (e.target === document.getElementById('tratarOverlay')) closeTratarModalDirect(); };
 window.closeTratarModalDirect = function() { document.getElementById('tratarOverlay').classList.remove('open'); };
 
+// ===== SECRETARIA =====
 const JUST_POR_TIPO = {
   'Falta': ['Doença','Consulta médica','Problema familiar','Sem justificativa','Outra'],
   'Atraso': ['Transporte','Problema familiar','Sem justificativa','Outra'],
@@ -2295,7 +2292,6 @@ function updateSecAlertas() {
 }
 
 // Set default date/time for secretaria form
-// date set above
 document.getElementById('sData').value = today.toISOString().split('T')[0];
 document.getElementById('sHora').value = String(today.getHours()).padStart(2,'0')+':'+String(today.getMinutes()).padStart(2,'0');
 
