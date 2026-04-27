@@ -2098,6 +2098,140 @@ window.imprimirTodos = function() {
     '9º A - Integral','9º B - Integral','9º C - Integral'
   ];
 
+  const alunosOcorr = {};
+  (window.records || []).forEach(r => {
+    const key = r.nome + '||' + r.turma;
+    if (!alunosOcorr[key]) alunosOcorr[key] = { nome: r.nome, turma: r.turma, ocorrencias: [], secretaria: [] };
+    alunosOcorr[key].ocorrencias.push(r);
+  });
+  (window.secRecords || []).forEach(r => {
+    const key = r.nome + '||' + r.turma;
+    if (!alunosOcorr[key]) alunosOcorr[key] = { nome: r.nome, turma: r.turma, ocorrencias: [], secretaria: [] };
+    alunosOcorr[key].secretaria.push(r);
+  });
+
+  if (!Object.keys(alunosOcorr).length) {
+    alert('Não há registros para imprimir.'); return;
+  }
+
+  const alunos = Object.values(alunosOcorr).sort((a, b) => {
+    const ta = turmasOrdem.indexOf(a.turma), tb = turmasOrdem.indexOf(b.turma);
+    if (ta !== tb) return ta - tb;
+    return a.nome.localeCompare(b.nome);
+  });
+
+  const hoje = new Date().toLocaleDateString('pt-BR');
+  let turmaAtual = '';
+
+  let html = `<style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;font-size:11px;color:#1a1a1a;background:#fff;padding:20px}
+    .capa{text-align:center;padding:40px 20px;margin-bottom:30px;border-bottom:3px solid #1a8a7a;page-break-after:always}
+    .capa h1{font-size:20px;font-weight:900;margin-bottom:6px}
+    .capa h2{font-size:15px;color:#1a8a7a;margin-bottom:16px}
+    .capa p{font-size:11px;color:#555;margin-bottom:4px}
+    .turma-header{background:#1c2333;color:#fff;padding:8px 14px;font-size:13px;font-weight:900;text-transform:uppercase;margin:20px 0 8px;page-break-before:always}
+    .turma-header:first-of-type{page-break-before:avoid;margin-top:0}
+    .aluno-bloco{border:1px solid #ddd;border-radius:3px;margin-bottom:12px;page-break-inside:avoid}
+    .aluno-header{display:flex;align-items:center;justify-content:space-between;background:#f5f5f5;padding:8px 12px;border-bottom:1px solid #ddd}
+    .aluno-nome{font-size:11px;font-weight:900;text-transform:uppercase}
+    .aluno-turma{font-size:9px;color:#888;margin-top:1px}
+    .resumo{display:flex;gap:10px}
+    .resumo-item{text-align:center}
+    .resumo-num{font-size:14px;font-weight:900}
+    .resumo-label{font-size:8px;color:#888;text-transform:uppercase}
+    .secao{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#888;padding:6px 12px 3px;border-bottom:1px solid #f0f0f0}
+    table{width:100%;border-collapse:collapse}
+    th{background:#f0f0f0;font-size:8px;font-weight:700;text-transform:uppercase;padding:5px 8px;text-align:left;color:#555}
+    td{padding:5px 8px;border-bottom:1px solid #f5f5f5;font-size:9px;vertical-align:top}
+    tr:last-child td{border-bottom:none}
+    .b{display:inline-block;font-size:8px;font-weight:700;padding:1px 6px;border-radius:2px}
+    .b-alta{background:#fef2f2;color:#b91c1c;border:1px solid #fca5a5}
+    .b-media{background:#fffbeb;color:#92400e;border:1px solid #fcd34d}
+    .b-baixa{background:#f0fdf4;color:#166534;border:1px solid #86efac}
+    .b-aberto{background:#eff6ff;color:#1e40af;border:1px solid #93c5fd}
+    .b-resolvido{background:#f0fdf4;color:#166534;border:1px solid #86efac}
+    .b-falta{background:#fef2f2;color:#b91c1c;border:1px solid #fca5a5}
+    .b-atraso{background:#fffbeb;color:#92400e;border:1px solid #fcd34d}
+    .b-saida{background:#eff6ff;color:#1e40af;border:1px solid #93c5fd}
+    .vazio{padding:8px 12px;color:#aaa;font-style:italic;font-size:9px}
+    .rodape{text-align:center;color:#aaa;font-size:8px;margin-top:24px;padding-top:8px;border-top:1px solid #ddd}
+    @media print{body{padding:0} .turma-header{page-break-before:always} .turma-header:first-of-type{page-break-before:avoid} *{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+  </style>
+  <div class="capa">
+    <h1>EMTI Reitor Roberto Cláudio Frota Bezerra</h1>
+    <h2>Relatório Geral de Ocorrências e Registros · Ano Letivo 2026</h2>
+    <p>Gerado em: <strong>${hoje}</strong></p>
+    <p>Alunos com registros: <strong>${alunos.length}</strong> &nbsp;|&nbsp; Ocorrências: <strong>${(window.records||[]).length}</strong> &nbsp;|&nbsp; Registros da Secretaria: <strong>${(window.secRecords||[]).length}</strong></p>
+  </div>`;
+
+  alunos.forEach(aluno => {
+    if (aluno.turma !== turmaAtual) {
+      turmaAtual = aluno.turma;
+      html += `<div class="turma-header">📚 ${turmaAtual}</div>`;
+    }
+    const abertas = aluno.ocorrencias.filter(r => !r.gestora || r.gestora.status !== 'Resolvido').length;
+    const faltas  = aluno.secretaria.filter(r => r.tipo === 'Falta').length;
+    const atrasos = aluno.secretaria.filter(r => r.tipo === 'Atraso').length;
+    const saidas  = aluno.secretaria.filter(r => r.tipo === 'Saída Antecipada').length;
+
+    html += `<div class="aluno-bloco">
+      <div class="aluno-header">
+        <div><div class="aluno-nome">${aluno.nome}</div><div class="aluno-turma">${aluno.turma}</div></div>
+        <div class="resumo">
+          <div class="resumo-item"><div class="resumo-num" style="color:#1a8a7a">${aluno.ocorrencias.length}</div><div class="resumo-label">Ocorr.</div></div>
+          <div class="resumo-item"><div class="resumo-num" style="color:#2563a8">${abertas}</div><div class="resumo-label">Aberto</div></div>
+          <div class="resumo-item"><div class="resumo-num" style="color:#b91c1c">${faltas}</div><div class="resumo-label">Faltas</div></div>
+          <div class="resumo-item"><div class="resumo-num" style="color:#92400e">${atrasos}</div><div class="resumo-label">Atrasos</div></div>
+          <div class="resumo-item"><div class="resumo-num" style="color:#1e40af">${saidas}</div><div class="resumo-label">Saídas</div></div>
+        </div>
+      </div>`;
+
+    if (aluno.ocorrencias.length) {
+      aluno.ocorrencias.sort((a,b)=>a.date.localeCompare(b.date));
+      html += `<div class="secao">📋 Ocorrências (${aluno.ocorrencias.length})</div><table><thead><tr><th>Data</th><th>Tipo</th><th>Gravidade</th><th>Professor</th><th>Status</th></tr></thead><tbody>`;
+      aluno.ocorrencias.forEach(r => {
+        const sev = r.sev||'';
+        const status = r.gestora?.status||'Em aberto';
+        const sc = sev==='Alta'?'b-alta':sev==='Média'?'b-media':'b-baixa';
+        const stc = status==='Resolvido'?'b-resolvido':'b-aberto';
+        html += `<tr><td>${formatDate(r.date)}</td><td>${r.tipo}</td><td><span class="b ${sc}">${sev}</span></td><td>${r.prof||'—'}</td><td><span class="b ${stc}">${status}</span></td></tr>`;
+      });
+      html += `</tbody></table>`;
+    } else {
+      html += `<div class="vazio">Nenhuma ocorrência registrada.</div>`;
+    }
+
+    if (aluno.secretaria.length) {
+      aluno.secretaria.sort((a,b)=>a.date.localeCompare(b.date));
+      html += `<div class="secao">📅 Secretaria (${aluno.secretaria.length})</div><table><thead><tr><th>Data</th><th>Tipo</th><th>Justificativa</th><th>Atestado</th><th>Família</th></tr></thead><tbody>`;
+      aluno.secretaria.forEach(r => {
+        const tc = r.tipo==='Falta'?'b-falta':r.tipo==='Atraso'?'b-atraso':'b-saida';
+        html += `<tr><td>${formatDate(r.date)}</td><td><span class="b ${tc}">${r.tipo}</span></td><td>${r.justificativa||'—'}</td><td>${r.atestado||'—'}</td><td style="color:${r.contato==='Sim'?'#1e7d4f':'#888'}">${r.contato||'—'}</td></tr>`;
+      });
+      html += `</tbody></table>`;
+    }
+
+    html += `</div>`;
+  });
+
+  html += `<div class="rodape">EMTI Reitor Roberto Cláudio Frota Bezerra · Relatório gerado em ${hoje}</div>`;
+
+  // Criar iframe invisível para impressão
+  let iframe = document.getElementById('printFrame');
+  if (!iframe) {
+    iframe = document.createElement('iframe');
+    iframe.id = 'printFrame';
+    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:210mm;height:297mm;border:none';
+    document.body.appendChild(iframe);
+  }
+  iframe.srcdoc = html;
+  iframe.onload = () => {
+    iframe.contentWindow.focus();
+    iframe.contentWindow.print();
+  };
+};
+
   // Agrupar ocorrências por aluno
   const alunosOcorr = {};
   (window.records || []).forEach(r => {
@@ -2263,13 +2397,6 @@ window.imprimirTodos = function() {
     html += `</div>`;
   });
 
-  html += `<div class="rodape">EMTI Reitor Roberto Cláudio Frota Bezerra · Relatório gerado em ${today} · Sistema de Registro de Ocorrências</div></body></html>`;
-
-  const win = window.open('', '_blank');
-  win.document.write(html);
-  win.document.close();
-  win.onload = () => win.print();
-};
 const JUST_POR_TIPO = {
   'Falta': ['Doença','Consulta médica','Problema familiar','Sem justificativa','Outra'],
   'Atraso': ['Transporte','Problema familiar','Sem justificativa','Outra'],
