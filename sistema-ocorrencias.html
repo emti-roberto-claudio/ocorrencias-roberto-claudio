@@ -2603,8 +2603,9 @@ function updateSecAlertas() {
 }
 
 // Set default date/time for secretaria form
-document.getElementById('sData').value = today.toISOString().split('T')[0];
-document.getElementById('sHora').value = String(today.getHours()).padStart(2,'0')+':'+String(today.getMinutes()).padStart(2,'0');
+const todayNow = new Date();
+document.getElementById('sData').value = todayNow.toISOString().split('T')[0];
+document.getElementById('sHora').value = String(todayNow.getHours()).padStart(2,'0')+':'+String(todayNow.getMinutes()).padStart(2,'0');
 
 // ===== LISTA REAL DE ALUNOS =====
 const ALUNOS_POR_TURMA = {
