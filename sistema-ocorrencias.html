@@ -43,6 +43,9 @@ onSnapshot(q, (snapshot) => {
   if (activeTab === 'dash')   renderDash();
   if (activeTab === 'gestao') renderGestao();
   document.getElementById('loadingOverlay')?.remove();
+}, (error) => {
+  console.error('Firestore error:', error);
+  document.getElementById('loadingOverlay')?.remove();
 });
 
 // Escuta secretaria em tempo real
@@ -52,6 +55,8 @@ onSnapshot(qSec, (snapshot) => {
   if (typeof updateSecAlertas === 'function') updateSecAlertas();
   const activeTab = document.querySelector('.nav-tab.active')?.id?.replace('tab-','');
   if (activeTab === 'sec') renderSecHist();
+}, (error) => {
+  console.error('Firestore sec error:', error);
 });
 </script>
 <style>
@@ -944,11 +949,6 @@ tr:hover td{background:var(--paper)}
       </select>
       <select id="filterTurma" onchange="renderDash()">
         <option value="">Todas as turmas</option>
-      </select>
-      <button onclick="imprimirTodos()" style="display:flex;align-items:center;gap:6px;padding:8px 16px;background:#1a8a7a;color:#fff;border:none;border-radius:3px;font-family:'Syne',sans-serif;font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;cursor:pointer">
-        <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:#fff"><path d="M19 8H5a3 3 0 0 0-3 3v6h4v4h12v-4h4v-6a3 3 0 0 0-3-3zm-3 11H8v-5h8v5zm3-7a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm-1-9H6v4h12V3z"/></svg>
-        Imprimir Todos
-      </button>
     </div>
   </div>
 
@@ -2089,314 +2089,6 @@ window.saveTratar = function() {
 window.closeTratarModal = function(e) { if (e.target === document.getElementById('tratarOverlay')) closeTratarModalDirect(); };
 window.closeTratarModalDirect = function() { document.getElementById('tratarOverlay').classList.remove('open'); };
 
-// ===== IMPRIMIR TODOS =====
-window.imprimirTodos = function() {
-  const turmasOrdem = [
-    '6º A - Integral','6º B - Integral','6º C - Integral',
-    '7º A - Integral','7º B - Integral','7º C - Integral',
-    '8º A - Integral','8º B - Integral','8º C - Integral',
-    '9º A - Integral','9º B - Integral','9º C - Integral'
-  ];
-
-  const alunosOcorr = {};
-  (window.records || []).forEach(r => {
-    const key = r.nome + '||' + r.turma;
-    if (!alunosOcorr[key]) alunosOcorr[key] = { nome: r.nome, turma: r.turma, ocorrencias: [], secretaria: [] };
-    alunosOcorr[key].ocorrencias.push(r);
-  });
-  (window.secRecords || []).forEach(r => {
-    const key = r.nome + '||' + r.turma;
-    if (!alunosOcorr[key]) alunosOcorr[key] = { nome: r.nome, turma: r.turma, ocorrencias: [], secretaria: [] };
-    alunosOcorr[key].secretaria.push(r);
-  });
-
-  if (!Object.keys(alunosOcorr).length) {
-    alert('Não há registros para imprimir.'); return;
-  }
-
-  const alunos = Object.values(alunosOcorr).sort((a, b) => {
-    const ta = turmasOrdem.indexOf(a.turma), tb = turmasOrdem.indexOf(b.turma);
-    if (ta !== tb) return ta - tb;
-    return a.nome.localeCompare(b.nome);
-  });
-
-  const hoje = new Date().toLocaleDateString('pt-BR');
-  let turmaAtual = '';
-
-  let html = `<style>
-    *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:Arial,sans-serif;font-size:11px;color:#1a1a1a;background:#fff;padding:20px}
-    .capa{text-align:center;padding:40px 20px;margin-bottom:30px;border-bottom:3px solid #1a8a7a;page-break-after:always}
-    .capa h1{font-size:20px;font-weight:900;margin-bottom:6px}
-    .capa h2{font-size:15px;color:#1a8a7a;margin-bottom:16px}
-    .capa p{font-size:11px;color:#555;margin-bottom:4px}
-    .turma-header{background:#1c2333;color:#fff;padding:8px 14px;font-size:13px;font-weight:900;text-transform:uppercase;margin:20px 0 8px;page-break-before:always}
-    .turma-header:first-of-type{page-break-before:avoid;margin-top:0}
-    .aluno-bloco{border:1px solid #ddd;border-radius:3px;margin-bottom:12px;page-break-inside:avoid}
-    .aluno-header{display:flex;align-items:center;justify-content:space-between;background:#f5f5f5;padding:8px 12px;border-bottom:1px solid #ddd}
-    .aluno-nome{font-size:11px;font-weight:900;text-transform:uppercase}
-    .aluno-turma{font-size:9px;color:#888;margin-top:1px}
-    .resumo{display:flex;gap:10px}
-    .resumo-item{text-align:center}
-    .resumo-num{font-size:14px;font-weight:900}
-    .resumo-label{font-size:8px;color:#888;text-transform:uppercase}
-    .secao{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#888;padding:6px 12px 3px;border-bottom:1px solid #f0f0f0}
-    table{width:100%;border-collapse:collapse}
-    th{background:#f0f0f0;font-size:8px;font-weight:700;text-transform:uppercase;padding:5px 8px;text-align:left;color:#555}
-    td{padding:5px 8px;border-bottom:1px solid #f5f5f5;font-size:9px;vertical-align:top}
-    tr:last-child td{border-bottom:none}
-    .b{display:inline-block;font-size:8px;font-weight:700;padding:1px 6px;border-radius:2px}
-    .b-alta{background:#fef2f2;color:#b91c1c;border:1px solid #fca5a5}
-    .b-media{background:#fffbeb;color:#92400e;border:1px solid #fcd34d}
-    .b-baixa{background:#f0fdf4;color:#166534;border:1px solid #86efac}
-    .b-aberto{background:#eff6ff;color:#1e40af;border:1px solid #93c5fd}
-    .b-resolvido{background:#f0fdf4;color:#166534;border:1px solid #86efac}
-    .b-falta{background:#fef2f2;color:#b91c1c;border:1px solid #fca5a5}
-    .b-atraso{background:#fffbeb;color:#92400e;border:1px solid #fcd34d}
-    .b-saida{background:#eff6ff;color:#1e40af;border:1px solid #93c5fd}
-    .vazio{padding:8px 12px;color:#aaa;font-style:italic;font-size:9px}
-    .rodape{text-align:center;color:#aaa;font-size:8px;margin-top:24px;padding-top:8px;border-top:1px solid #ddd}
-    @media print{body{padding:0} .turma-header{page-break-before:always} .turma-header:first-of-type{page-break-before:avoid} *{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
-  </style>
-  <div class="capa">
-    <h1>EMTI Reitor Roberto Cláudio Frota Bezerra</h1>
-    <h2>Relatório Geral de Ocorrências e Registros · Ano Letivo 2026</h2>
-    <p>Gerado em: <strong>${hoje}</strong></p>
-    <p>Alunos com registros: <strong>${alunos.length}</strong> &nbsp;|&nbsp; Ocorrências: <strong>${(window.records||[]).length}</strong> &nbsp;|&nbsp; Registros da Secretaria: <strong>${(window.secRecords||[]).length}</strong></p>
-  </div>`;
-
-  alunos.forEach(aluno => {
-    if (aluno.turma !== turmaAtual) {
-      turmaAtual = aluno.turma;
-      html += `<div class="turma-header">📚 ${turmaAtual}</div>`;
-    }
-    const abertas = aluno.ocorrencias.filter(r => !r.gestora || r.gestora.status !== 'Resolvido').length;
-    const faltas  = aluno.secretaria.filter(r => r.tipo === 'Falta').length;
-    const atrasos = aluno.secretaria.filter(r => r.tipo === 'Atraso').length;
-    const saidas  = aluno.secretaria.filter(r => r.tipo === 'Saída Antecipada').length;
-
-    html += `<div class="aluno-bloco">
-      <div class="aluno-header">
-        <div><div class="aluno-nome">${aluno.nome}</div><div class="aluno-turma">${aluno.turma}</div></div>
-        <div class="resumo">
-          <div class="resumo-item"><div class="resumo-num" style="color:#1a8a7a">${aluno.ocorrencias.length}</div><div class="resumo-label">Ocorr.</div></div>
-          <div class="resumo-item"><div class="resumo-num" style="color:#2563a8">${abertas}</div><div class="resumo-label">Aberto</div></div>
-          <div class="resumo-item"><div class="resumo-num" style="color:#b91c1c">${faltas}</div><div class="resumo-label">Faltas</div></div>
-          <div class="resumo-item"><div class="resumo-num" style="color:#92400e">${atrasos}</div><div class="resumo-label">Atrasos</div></div>
-          <div class="resumo-item"><div class="resumo-num" style="color:#1e40af">${saidas}</div><div class="resumo-label">Saídas</div></div>
-        </div>
-      </div>`;
-
-    if (aluno.ocorrencias.length) {
-      aluno.ocorrencias.sort((a,b)=>a.date.localeCompare(b.date));
-      html += `<div class="secao">📋 Ocorrências (${aluno.ocorrencias.length})</div><table><thead><tr><th>Data</th><th>Tipo</th><th>Gravidade</th><th>Professor</th><th>Status</th></tr></thead><tbody>`;
-      aluno.ocorrencias.forEach(r => {
-        const sev = r.sev||'';
-        const status = r.gestora?.status||'Em aberto';
-        const sc = sev==='Alta'?'b-alta':sev==='Média'?'b-media':'b-baixa';
-        const stc = status==='Resolvido'?'b-resolvido':'b-aberto';
-        html += `<tr><td>${formatDate(r.date)}</td><td>${r.tipo}</td><td><span class="b ${sc}">${sev}</span></td><td>${r.prof||'—'}</td><td><span class="b ${stc}">${status}</span></td></tr>`;
-      });
-      html += `</tbody></table>`;
-    } else {
-      html += `<div class="vazio">Nenhuma ocorrência registrada.</div>`;
-    }
-
-    if (aluno.secretaria.length) {
-      aluno.secretaria.sort((a,b)=>a.date.localeCompare(b.date));
-      html += `<div class="secao">📅 Secretaria (${aluno.secretaria.length})</div><table><thead><tr><th>Data</th><th>Tipo</th><th>Justificativa</th><th>Atestado</th><th>Família</th></tr></thead><tbody>`;
-      aluno.secretaria.forEach(r => {
-        const tc = r.tipo==='Falta'?'b-falta':r.tipo==='Atraso'?'b-atraso':'b-saida';
-        html += `<tr><td>${formatDate(r.date)}</td><td><span class="b ${tc}">${r.tipo}</span></td><td>${r.justificativa||'—'}</td><td>${r.atestado||'—'}</td><td style="color:${r.contato==='Sim'?'#1e7d4f':'#888'}">${r.contato||'—'}</td></tr>`;
-      });
-      html += `</tbody></table>`;
-    }
-
-    html += `</div>`;
-  });
-
-  html += `<div class="rodape">EMTI Reitor Roberto Cláudio Frota Bezerra · Relatório gerado em ${hoje}</div>`;
-
-  // Criar iframe invisível para impressão
-  let iframe = document.getElementById('printFrame');
-  if (!iframe) {
-    iframe = document.createElement('iframe');
-    iframe.id = 'printFrame';
-    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:210mm;height:297mm;border:none';
-    document.body.appendChild(iframe);
-  }
-  iframe.srcdoc = html;
-  iframe.onload = () => {
-    iframe.contentWindow.focus();
-    iframe.contentWindow.print();
-  };
-};
-
-  // Agrupar ocorrências por aluno
-  const alunosOcorr = {};
-  (window.records || []).forEach(r => {
-    const key = r.nome + '||' + r.turma;
-    if (!alunosOcorr[key]) alunosOcorr[key] = { nome: r.nome, turma: r.turma, ocorrencias: [], secretaria: [] };
-    alunosOcorr[key].ocorrencias.push(r);
-  });
-
-  // Agrupar registros da secretaria por aluno
-  (window.secRecords || []).forEach(r => {
-    const key = r.nome + '||' + r.turma;
-    if (!alunosOcorr[key]) alunosOcorr[key] = { nome: r.nome, turma: r.turma, ocorrencias: [], secretaria: [] };
-    alunosOcorr[key].secretaria.push(r);
-  });
-
-  if (!Object.keys(alunosOcorr).length) {
-    alert('Não há registros para imprimir.'); return;
-  }
-
-  // Ordenar alunos por turma e nome
-  const alunos = Object.values(alunosOcorr).sort((a, b) => {
-    const ta = turmasOrdem.indexOf(a.turma), tb = turmasOrdem.indexOf(b.turma);
-    if (ta !== tb) return ta - tb;
-    return a.nome.localeCompare(b.nome);
-  });
-
-  const today = new Date().toLocaleDateString('pt-BR');
-  const sevCor = { 'Alta': '#b91c1c', 'Média': '#92400e', 'Baixa': '#1e7d4f' };
-  const tipoCor = { 'Falta': '#b91c1c', 'Atraso': '#92400e', 'Saída Antecipada': '#1e40af' };
-
-  let turmaAtual = '';
-  let html = `
-    <!DOCTYPE html>
-    <html lang="pt-BR">
-    <head>
-      <meta charset="UTF-8"/>
-      <title>Relatório Geral de Ocorrências · EMTI Roberto Cláudio · ${today}</title>
-      <style>
-        *{box-sizing:border-box;margin:0;padding:0}
-        body{font-family:'Arial',sans-serif;font-size:11px;color:#1a1a1a;background:#fff}
-        .capa{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;text-align:center;page-break-after:always}
-        .capa h1{font-size:22px;font-weight:900;margin-bottom:8px;letter-spacing:0.02em}
-        .capa h2{font-size:16px;font-weight:700;color:#1a8a7a;margin-bottom:24px}
-        .capa p{font-size:12px;color:#555;margin-bottom:6px}
-        .capa .linha{width:60px;height:3px;background:#1a8a7a;margin:20px auto}
-        .turma-header{background:#1c2333;color:#fff;padding:10px 16px;font-size:14px;font-weight:900;letter-spacing:0.05em;text-transform:uppercase;margin-top:24px;margin-bottom:0;page-break-before:auto}
-        .turma-header:first-of-type{margin-top:0}
-        .aluno-bloco{border:1px solid #e0ddd5;border-radius:4px;margin:12px 0;page-break-inside:avoid}
-        .aluno-header{display:flex;align-items:center;justify-content:space-between;background:#f7f6f2;padding:10px 14px;border-bottom:1px solid #e0ddd5}
-        .aluno-nome{font-size:12px;font-weight:900;color:#1a1a1a;text-transform:uppercase}
-        .aluno-turma{font-size:10px;color:#6b7a99;margin-top:2px}
-        .aluno-resumo{display:flex;gap:12px}
-        .resumo-item{text-align:center}
-        .resumo-num{font-size:16px;font-weight:900}
-        .resumo-label{font-size:9px;color:#6b7a99;text-transform:uppercase}
-        .secao-titulo{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#6b7a99;padding:8px 14px 4px;border-bottom:1px solid #f0ece4}
-        table{width:100%;border-collapse:collapse}
-        th{background:#f0ece4;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;padding:6px 10px;text-align:left;color:#555}
-        td{padding:6px 10px;border-bottom:1px solid #f7f6f2;font-size:10px;vertical-align:top}
-        tr:last-child td{border-bottom:none}
-        .badge{display:inline-block;font-size:9px;font-weight:700;padding:1px 7px;border-radius:2px}
-        .badge-alta{background:#fef2f2;color:#b91c1c;border:1px solid #fca5a5}
-        .badge-media{background:#fffbeb;color:#92400e;border:1px solid #fcd34d}
-        .badge-baixa{background:#f0fdf4;color:#166534;border:1px solid #86efac}
-        .badge-aberto{background:#eff6ff;color:#1e40af;border:1px solid #93c5fd}
-        .badge-resolvido{background:#f0fdf4;color:#166534;border:1px solid #86efac}
-        .badge-falta{background:#fef2f2;color:#b91c1c;border:1px solid #fca5a5}
-        .badge-atraso{background:#fffbeb;color:#92400e;border:1px solid #fcd34d}
-        .badge-saida{background:#eff6ff;color:#1e40af;border:1px solid #93c5fd}
-        .sem-registro{padding:10px 14px;color:#aaa;font-style:italic;font-size:10px}
-        .rodape{text-align:center;color:#aaa;font-size:9px;margin-top:32px;padding-top:12px;border-top:1px solid #e0ddd5}
-        @media print{
-          body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-          .turma-header{page-break-before:always}
-          .turma-header:first-of-type{page-break-before:avoid}
-        }
-      </style>
-    </head>
-    <body>
-      <div class="capa">
-        <div class="linha"></div>
-        <h1>EMTI Reitor Roberto Cláudio Frota Bezerra</h1>
-        <h2>Relatório Geral de Ocorrências e Registros</h2>
-        <p>Ano Letivo 2026</p>
-        <p>Gerado em: <strong>${today}</strong></p>
-        <p>Total de alunos com registros: <strong>${alunos.length}</strong></p>
-        <p>Total de ocorrências: <strong>${(window.records||[]).length}</strong></p>
-        <p>Total de registros da secretaria: <strong>${(window.secRecords||[]).length}</strong></p>
-        <div class="linha"></div>
-      </div>`;
-
-  alunos.forEach(aluno => {
-    // Cabeçalho de turma
-    if (aluno.turma !== turmaAtual) {
-      turmaAtual = aluno.turma;
-      html += `<div class="turma-header">📚 ${turmaAtual}</div>`;
-    }
-
-    const totalOcorr = aluno.ocorrencias.length;
-    const totalSec   = aluno.secretaria.length;
-    const abertas    = aluno.ocorrencias.filter(r => !r.gestora || r.gestora.status !== 'Resolvido').length;
-    const faltas     = aluno.secretaria.filter(r => r.tipo === 'Falta').length;
-    const atrasos    = aluno.secretaria.filter(r => r.tipo === 'Atraso').length;
-    const saidas     = aluno.secretaria.filter(r => r.tipo === 'Saída Antecipada').length;
-
-    html += `
-      <div class="aluno-bloco">
-        <div class="aluno-header">
-          <div>
-            <div class="aluno-nome">${aluno.nome}</div>
-            <div class="aluno-turma">${aluno.turma}</div>
-          </div>
-          <div class="aluno-resumo">
-            <div class="resumo-item"><div class="resumo-num" style="color:#1a8a7a">${totalOcorr}</div><div class="resumo-label">Ocorrências</div></div>
-            <div class="resumo-item"><div class="resumo-num" style="color:#2563a8">${abertas}</div><div class="resumo-label">Em aberto</div></div>
-            <div class="resumo-item"><div class="resumo-num" style="color:#b91c1c">${faltas}</div><div class="resumo-label">Faltas</div></div>
-            <div class="resumo-item"><div class="resumo-num" style="color:#92400e">${atrasos}</div><div class="resumo-label">Atrasos</div></div>
-            <div class="resumo-item"><div class="resumo-num" style="color:#1e40af">${saidas}</div><div class="resumo-label">Saídas</div></div>
-          </div>
-        </div>`;
-
-    // Ocorrências
-    if (aluno.ocorrencias.length) {
-      aluno.ocorrencias.sort((a,b) => a.date.localeCompare(b.date));
-      html += `<div class="secao-titulo">📋 Ocorrências (${totalOcorr})</div>
-        <table><thead><tr><th>Data</th><th>Tipo</th><th>Gravidade</th><th>Professor</th><th>Status</th></tr></thead><tbody>`;
-      aluno.ocorrencias.forEach(r => {
-        const sev    = r.sev || '';
-        const status = r.gestora?.status || 'Em aberto';
-        const sevCls = sev === 'Alta' ? 'badge-alta' : sev === 'Média' ? 'badge-media' : 'badge-baixa';
-        const stCls  = status === 'Resolvido' ? 'badge-resolvido' : 'badge-aberto';
-        html += `<tr>
-          <td>${formatDate(r.date)}</td>
-          <td style="max-width:200px">${r.tipo}</td>
-          <td><span class="badge ${sevCls}">${sev}</span></td>
-          <td>${r.prof||'—'}</td>
-          <td><span class="badge ${stCls}">${status}</span></td>
-        </tr>`;
-      });
-      html += `</tbody></table>`;
-    } else {
-      html += `<div class="sem-registro">Nenhuma ocorrência registrada.</div>`;
-    }
-
-    // Secretaria
-    if (aluno.secretaria.length) {
-      aluno.secretaria.sort((a,b) => a.date.localeCompare(b.date));
-      html += `<div class="secao-titulo">📅 Registros da Secretaria (${totalSec})</div>
-        <table><thead><tr><th>Data</th><th>Tipo</th><th>Justificativa</th><th>Atestado</th><th>Família</th></tr></thead><tbody>`;
-      aluno.secretaria.forEach(r => {
-        const tipoCls = r.tipo === 'Falta' ? 'badge-falta' : r.tipo === 'Atraso' ? 'badge-atraso' : 'badge-saida';
-        html += `<tr>
-          <td>${formatDate(r.date)}</td>
-          <td><span class="badge ${tipoCls}">${r.tipo}</span></td>
-          <td>${r.justificativa||'—'}</td>
-          <td>${r.atestado||'—'}</td>
-          <td style="color:${r.contato==='Sim'?'#1e7d4f':'#888'}">${r.contato||'—'}</td>
-        </tr>`;
-      });
-      html += `</tbody></table>`;
-    }
-
-    html += `</div>`;
-  });
-
 const JUST_POR_TIPO = {
   'Falta': ['Doença','Consulta médica','Problema familiar','Sem justificativa','Outra'],
   'Atraso': ['Transporte','Problema familiar','Sem justificativa','Outra'],
@@ -2603,9 +2295,9 @@ function updateSecAlertas() {
 }
 
 // Set default date/time for secretaria form
-const todayNow = new Date();
-document.getElementById('sData').value = todayNow.toISOString().split('T')[0];
-document.getElementById('sHora').value = String(todayNow.getHours()).padStart(2,'0')+':'+String(todayNow.getMinutes()).padStart(2,'0');
+// date set above
+document.getElementById('sData').value = today.toISOString().split('T')[0];
+document.getElementById('sHora').value = String(today.getHours()).padStart(2,'0')+':'+String(today.getMinutes()).padStart(2,'0');
 
 // ===== LISTA REAL DE ALUNOS =====
 const ALUNOS_POR_TURMA = {
